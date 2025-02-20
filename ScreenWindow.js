@@ -3,9 +3,13 @@ export default class ScreenWindow {
     #id;
     #canvas;
 
-    constructor ( id = null ) {
-        this.#id = id;
+    #onLoadFunc;
+    #onResizeFunc;
 
+    constructor ( id, onLoad, onResize ) {
+        this.#id = id;
+        this.#onLoadFunc = onLoad;
+        this.#onResizeFunc = onResize;
     }
 
     #onLoad ( onLoad ) {
@@ -18,7 +22,7 @@ export default class ScreenWindow {
     }   
 
     #onResize ( ) {
-
+        
     }
 
     open ( onLoad ) {
@@ -30,6 +34,9 @@ export default class ScreenWindow {
         this.#window.addEventListener("resize", onResize);
     } 
 
+    setOnLoad ( onLoad ) {
+
+    }
 
 
     close ( ) {
