@@ -61,6 +61,8 @@ export default class RenderManager {
         const gridHelper = new THREE.GridHelper(100, 20);
         gridHelper.lookAt(new THREE.Vector3(0, 1, 0));
         sceneGroup.add(gridHelper);
+
+ 
     
         const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
         const boxEdgeGeometry = new THREE.EdgesGeometry(boxGeometry);
@@ -132,6 +134,13 @@ export default class RenderManager {
         // caveHelper.layers.set(0);
         // console.log(caveHelper.layers)
         // caveHelper.layers.enable(16);
+        const gridHelper2 = new THREE.GridHelper(1, 10);
+        gridHelper2.lookAt(new THREE.Vector3(0, 1, 0));
+        this.#scene.add(gridHelper2);
+        gridHelper2.rotateOnAxis(new THREE.Vector3(0, 1, 0), Math.PI / 4);
+        gridHelper2.position.set(0, PDS/2, 0)
+    
+
     }
 
     #renderDebug ( ) {
