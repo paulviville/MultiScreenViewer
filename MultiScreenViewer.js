@@ -6,6 +6,7 @@ export default class MultiScreenViewer {
     #renderWorker;
     #debugWindow;
     #debugCanvas;
+
     #screenWindows = [];
     #screenCanvas = [];
 
@@ -28,6 +29,7 @@ export default class MultiScreenViewer {
             this.#createDebugRenderer();
             this.#setOrbitControls();
             this.#debugWindow.setOnResize(this.#onDebugWindowResize.bind(this));
+            this.#debugWindow.setOnMouseDown(this.#debugOnMouseDown.bind(this));
         });
 
     }
@@ -62,27 +64,51 @@ export default class MultiScreenViewer {
         const height = this.#debugWindow.height;
         const width = this.#debugWindow.width;
         this.#renderWorker.postMessage({type: "debugCanvasResize", width: width, height: height});
-    } 
+    }
+    
+    #debugOnMouseDown ( x, y, buttons ) {
+        console.log("MultiScreenViewer.#debugOnMouseDown");
+        this.#renderWorker.postMessage({type : "debugMouseDown", x: x, y: y, buttons: buttons});
+    }
 
-    // loadScreens ( screens = [0] ) {
-    //     for(const screen of screens) {
-    //         this.#openScreenWindow(screen);
-    //     }
-    // }
+    #onScreenWindowResize ( id ) {
+        this.#renderWorker.postMessage({type : "screenCanvasResize", id: id, width: this.#screenWindows[id].width, height: this.#screenWindows[id].height});
+    }
 
-    // #openScreenWindow ( screen ) {
-    //     const screenWindow = window.open(`./screen.html?id=${this.#screenWindows.length}`, "", "width=800, height=600");
-    //     this.#screenWindows.push(screenWindow);
-    // }
+    async loadScreens ( screens ) {
+        console.log("MultiScreenViewer.loadScreens");
+        for(const screen of screens) {
+            console.log(screen)
+            await this.#openScreenWindow(screen);
+        }
+        this.#renderWorker.postMessage({type: "buildCave"});
+    }
+
+    async #openScreenWindow ( screen ) {
+        const id = this.#screenWindows.length;
+        const screenWindow = new ScreenWindow(`${id}`);
+        this.#screenWindows.push(screenWindow);
+
+        return new Promise( resolve => {
+            screenWindow.open(() => {
+                const screenCanvas = screenWindow.canvas.transferControlToOffscreen();
+                this.#renderWorker.postMessage({type: "newScreen", id: id, screen, canvas: screenCanvas},  [screenCanvas]);
+                screenWindow.setOnResize(this.#onScreenWindowResize.bind(this, id));
+
+                resolve(screenCanvas);
+            });
+        })
+       
+    }
 
     #cleanUp ( ) {
         if(this.#debugWindow) {
             this.#debugWindow.close();
         }
 
-        // for(const screenWindow of this.#screenWindows) {
-        //     screenWindow.close();
-        // }
+        for(const screenWindow of this.#screenWindows) {
+            screenWindow.close();
+        }
     }
 
     start ( ) { 

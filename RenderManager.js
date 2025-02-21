@@ -3,7 +3,7 @@ import CaveHelper from './CaveHelper.js';
 import Screen from './Screen.js';
 import Cave from './Cave.js';
 
-const DEBUG_LAYER = 0;
+const DEBUG_LAYER = 1;
 
 export default class RenderManager {
     #scene;
@@ -11,9 +11,14 @@ export default class RenderManager {
     #debugCamera;
     #debugRenderer;
 
+    #screens = [];
+    #screenCanvas = [];
+    #screenRenderers = [];
+    #cave;
+    #caveHelper;
+
     constructor ( ) {
         this.#initializeScene();
-        this.#initalizeCaveHelper();
 
         self.addEventListener("message", this.#handleMessage.bind(this));
     }
@@ -78,43 +83,9 @@ export default class RenderManager {
 
     #initalizeCaveHelper ( ) {
         const PDS = Math.sqrt(2) * 1.8;
-        // const t = new THREE.Vector3(1, 1, 0).normalize().multiplyScalar(2.25);
-        const t = new THREE.Vector3(1, 1, 0).normalize().multiplyScalar(2.25);
-        
-        const screenCorners0 = [
-            new THREE.Vector3(-PDS, 0, 0),
-            new THREE.Vector3(0, PDS, 0),
-            new THREE.Vector3(-PDS, 0, 2.25),
-            new THREE.Vector3(0, PDS, 2.25),
-        ];
-        
-        const screenCorners1 = [
-            new THREE.Vector3(0, PDS, 0),
-            new THREE.Vector3(PDS, 0, 0),
-            new THREE.Vector3( 0, PDS, 2.25),
-            new THREE.Vector3( PDS, 0, 2.25),
-        ];
-        
-        // const screenCorners2 = [
-        //   new THREE.Vector3(-t.x, PDS - t.y, 0),
-        //   new THREE.Vector3(PDS - t.x, -t.y, 0),
-        //   new THREE.Vector3(0, PDS, 0),
-        //   new THREE.Vector3(PDS, 0, 0),
-        // ];
 
-        const screenCorners2 = [
-            new THREE.Vector3(-PDS + 1.34, 1.34, 0),
-            new THREE.Vector3(-PDS +3.31, -0.63, 0),
-            new THREE.Vector3(0, PDS, 0),
-            new THREE.Vector3(1.97, PDS - 1.97, 0),
-        ];
-
-        const screen0 = new Screen(screenCorners0);
-        const screen1 = new Screen(screenCorners1);
-        const screen2 = new Screen(screenCorners2);
-        const cave = new Cave([screen0, screen1, screen2]);
-        const caveHelper = new CaveHelper(cave);
-        this.#scene.add(caveHelper);
+        this.#caveHelper = new CaveHelper(this.#cave);
+        this.#scene.add(this.#caveHelper);
 
 
         const targetPoint = new THREE.Vector3(-1.5, 3*PDS, 1.2)
@@ -127,13 +98,9 @@ export default class RenderManager {
         trackedCamera.updateProjectionMatrix();
         trackedCamera.updateWorldMatrix();
 
-        cave.updateStereoScreenCameras(trackedCamera.matrixWorld.clone());
-        caveHelper.updateStereoScreenCameraHelpers();
-        // caveHelper.layers.set(1);
-        caveHelper.setLayer(DEBUG_LAYER);
-        // caveHelper.layers.set(0);
-        // console.log(caveHelper.layers)
-        // caveHelper.layers.enable(16);
+        this.#cave.updateStereoScreenCameras(trackedCamera.matrixWorld.clone());
+        this.#caveHelper.updateStereoScreenCameraHelpers();
+        this.#caveHelper.setLayer(DEBUG_LAYER);
         const gridHelper2 = new THREE.GridHelper(1, 10);
         gridHelper2.lookAt(new THREE.Vector3(0, 1, 0));
         this.#scene.add(gridHelper2);
@@ -143,16 +110,28 @@ export default class RenderManager {
 
     }
 
+    #initializeCaveRenderer ( ) {
+        console.log("initializeCaveRenderer")
+        for(const screenCanvas of this.#screenCanvas) {
+            this.#screenRenderers.push(new THREE.WebGLRenderer({canvas: screenCanvas, antialias: true}))
+        }
+    }
+
     #renderDebug ( ) {
         if(this.#debugRenderer) {
             this.#debugRenderer.render(this.#scene, this.#debugCamera);
         }
-        requestAnimationFrame(this.#renderDebug.bind(this));
+    }
+
+    #renderScreens ( ) {
+        const stereoScreenCameras = this.#cave.stereoScreenCameras;
+        for(let id = 0; id < this.#screenRenderers.length; ++id) {
+            this.#screenRenderers[id].render(this.#scene, stereoScreenCameras[id].left);
+        }
     }
 
     #setDebugCanvas ( canvas ) {
         this.#debugCanvas = canvas;
-        console.log(this.#debugCanvas);
         this.#createDebugRenderer();
     }
 
@@ -161,7 +140,7 @@ export default class RenderManager {
     }
 
     #debugCanvasResize ( width, height ) {
-        console.log("this.#debugCanvasResize", width, height);
+        console.log("RenderManager.#debugCanvasResize", width, height);
         this.#debugCamera.aspect = width / height;
         this.#debugCamera.updateProjectionMatrix();
         this.#debugCanvas.width = width;
@@ -176,11 +155,33 @@ export default class RenderManager {
         this.#debugCamera.updateProjectionMatrix();
     }
 
+    #addScreen ( id, screen, canvas ) {
+        this.#screens[id] = new Screen(screen);
+        this.#screenCanvas[id] = canvas
+    }
+
+    #buildCave ( ) {
+        this.#cave = new Cave(this.#screens);
+        this.#initalizeCaveHelper();
+        this.#initializeCaveRenderer();
+    }
+
+    #render ( ) {
+        this.#renderDebug();
+        this.#renderScreens();
+        requestAnimationFrame(this.#render.bind(this));
+    }
+
+    #resizeScreenCanvas ( id, width, height ) {
+        console.log("RenderManager.#resizeScreenCanvas", width, height);
+        this.#screenCanvas[id].width = width;
+        this.#screenCanvas[id].height = height;
+        this.#screenRenderers[id].setSize( width, height, false );
+    }
+
     #handleMessage ( message ) {
-        // console.log(message)
         const data = message.data;
         const type = data.type;
-        // console.log(type, data);
         switch(type) {
             case "debugCanvas":
                 this.#setDebugCanvas(data.debugCanvas);
@@ -188,11 +189,24 @@ export default class RenderManager {
             case "debugCanvasResize":
                 this.#debugCanvasResize(data.width, data.height);
                 break;
+            case "screenCanvasResize":
+                this.#resizeScreenCanvas(data.id, data.width, data.height);
+                break;
             case "updateDebugCamera":
                 this.#updateDebugCamera(data.position, data.quaternion);
                 break;
             case "start":
-                this.#renderDebug();
+                this.#render();
+                break;
+            case "newScreen":
+                this.#addScreen(data.id, data.screen, data.canvas);
+                break;
+            case "buildCave":
+                this.#buildCave();
+                break;
+            default:
+                console.log(message);
+                break;
         }
     }
 }

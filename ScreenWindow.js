@@ -22,16 +22,22 @@ export default class ScreenWindow {
     }   
 
     #onResize ( ) {
-        
+
     }
 
     open ( onLoad ) {
-        this.#window = window.open(`./screen.html?id=${this.#id}`, "", "width=800, height=600");
+        this.#window = window.open(`./screen.html?id=${this.#id}`, "", "width=800, height=500");
         this.#window.addEventListener("load", this.#onLoad.bind(this, onLoad));
     }
 
     setOnResize ( onResize ) {
         this.#window.addEventListener("resize", onResize);
+    }
+
+    setOnMouseDown ( onMouseDown ) {
+        this.#window.addEventListener("mousedown", (event) => {
+            onMouseDown(event.x, event.y, event.buttons);
+        });
     } 
 
     setOnLoad ( onLoad ) {
