@@ -1,6 +1,8 @@
 import ScreenWindow from "./ScreenWindow.js";
 import * as THREE from "./three/three.module.js";
 import { OrbitControls } from "./three/controls/OrbitControls.js";
+import { GUI } from './three/libs/lil-gui.module.min.js'; 
+import Stats from './three/libs/stats.module.js';
 
 export default class MultiScreenViewer {
     #renderWorker;
@@ -8,9 +10,11 @@ export default class MultiScreenViewer {
     #debugCanvas;
 
     #screenWindows = [];
-    #screenCanvas = [];
 
     #camera;
+
+    #gui;
+    #stats;
 
     constructor ( ) {
         console.log("new MultiScreenViewer");
@@ -21,12 +25,21 @@ export default class MultiScreenViewer {
         this.#renderWorker.addEventListener("error", (event) => {
             console.log("worker error", event);
         });
+
+        this.#stats = new Stats();
+        document.body.appendChild(this.#stats.dom)
+
+        this.#renderWorker.addEventListener("message", (event) => {
+            if(event.data === "frame")
+                this.#stats.update();
+        });
     }
 
     openDebugWindow ( ) {
         this.#debugWindow = new ScreenWindow("debug");
         this.#debugWindow.open(() => {
             this.#createDebugRenderer();
+            this.#createDebugGui();
             this.#setOrbitControls();
             this.#debugWindow.setOnResize(this.#onDebugWindowResize.bind(this));
             this.#debugWindow.setOnMouseDown(this.#debugOnMouseDown.bind(this));
@@ -111,8 +124,26 @@ export default class MultiScreenViewer {
         }
     }
 
+    flipEye ( ) {
+        this.#renderWorker.postMessage({type : "flipEye"});
+    }
+
+    connectSocket ( ) {
+        this.#renderWorker.postMessage({type : "connectSocket"});
+    }
+
     start ( ) { 
         console.log("MultiScreenViewer.start");
         this.#renderWorker.postMessage({type : "start"});
+    }
+
+    guiFunc ( ) {
+
+    }
+
+    #createDebugGui ( ) {
+        this.#gui = new GUI();
+        this.#gui.add(this, "flipEye").name("Flip Eyes");
+        this.#gui.add(this, "connectSocket").name("Connect Socket");
     }
 }

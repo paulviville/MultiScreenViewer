@@ -17,10 +17,27 @@ export default class RenderManager {
     #cave;
     #caveHelper;
 
+    #trackedCamera;
+
+    #eye = "left";
+
+
+    #vrpnSocket;
+
     constructor ( ) {
         this.#initializeScene();
 
         self.addEventListener("message", this.#handleMessage.bind(this));
+    }
+
+    #connectSocket ( url = "ws://localhost:8080" ) {
+        this.#vrpnSocket = new WebSocket(url);
+        this.#vrpnSocket.addEventListener("message", this.#handleSocketMessage.bind(this));
+    }
+
+    #handleSocketMessage ( event ) {
+        console.log("server message: ", event.data);
+
     }
 
     #initializeScene ( ) {
@@ -91,14 +108,14 @@ export default class RenderManager {
         const targetPoint = new THREE.Vector3(-1.5, 3*PDS, 1.2)
         const worldUp = new THREE.Vector3(0, 0, 1);
 
-        const trackedCamera = new THREE.PerspectiveCamera( 50, 1, 0.1, 0.5 );
-        trackedCamera.up.copy(worldUp);
-        trackedCamera.position.set(0.5, -0.5, 1.3);
-        trackedCamera.lookAt(targetPoint)
-        trackedCamera.updateProjectionMatrix();
-        trackedCamera.updateWorldMatrix();
+        this.#trackedCamera = new THREE.PerspectiveCamera( 50, 1, 0.1, 0.5 );
+        this.#trackedCamera.up.copy(worldUp);
+        this.#trackedCamera.position.set(0.5, -0.5, 1.3);
+        this.#trackedCamera.lookAt(targetPoint)
+        this.#trackedCamera.updateProjectionMatrix();
+        this.#trackedCamera.updateWorldMatrix();
 
-        this.#cave.updateStereoScreenCameras(trackedCamera.matrixWorld.clone());
+        this.#cave.updateStereoScreenCameras(this.#trackedCamera.matrixWorld.clone());
         this.#caveHelper.updateStereoScreenCameraHelpers();
         this.#caveHelper.setLayer(DEBUG_LAYER);
         const gridHelper2 = new THREE.GridHelper(1, 10);
@@ -126,7 +143,7 @@ export default class RenderManager {
     #renderScreens ( ) {
         const stereoScreenCameras = this.#cave.stereoScreenCameras;
         for(let id = 0; id < this.#screenRenderers.length; ++id) {
-            this.#screenRenderers[id].render(this.#scene, stereoScreenCameras[id].left);
+            this.#screenRenderers[id].render(this.#scene, stereoScreenCameras[id][this.#eye]);
         }
     }
 
@@ -166,9 +183,15 @@ export default class RenderManager {
         this.#initializeCaveRenderer();
     }
 
+    #flipEye ( ) {
+        this.#eye = this.#eye === "left" ? "right" : "left";
+    }
+
     #render ( ) {
         this.#renderDebug();
         this.#renderScreens();
+        this.#flipEye();
+        postMessage("frame")
         requestAnimationFrame(this.#render.bind(this));
     }
 
@@ -203,6 +226,12 @@ export default class RenderManager {
                 break;
             case "buildCave":
                 this.#buildCave();
+                break;
+            case "flipEye":
+                this.#flipEye();
+                break;
+            case "connectSocket":
+                this.#connectSocket();
                 break;
             default:
                 console.log(message);
