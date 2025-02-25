@@ -27,7 +27,7 @@ export default class MultiScreenViewer {
         });
 
         this.#stats = new Stats();
-        document.body.appendChild(this.#stats.dom)
+        // document.body.appendChild(this.#stats.dom)
 
         this.#renderWorker.addEventListener("message", (event) => {
             if(event.data === "frame")
@@ -95,6 +95,8 @@ export default class MultiScreenViewer {
             await this.#openScreenWindow(screen);
         }
         this.#renderWorker.postMessage({type: "buildCave"});
+        this.#screenWindows[0].body.appendChild(this.#stats.dom)
+        
     }
 
     async #openScreenWindow ( screen ) {

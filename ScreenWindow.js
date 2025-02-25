@@ -60,4 +60,8 @@ export default class ScreenWindow {
     get height ( ) {
         return this.#window.innerHeight;
     }
+
+    get body ( ) {
+        return this.#window.document.body;
+    }
 }
